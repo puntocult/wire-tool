@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { initialTheme, applyTheme } from './theme';
 import { uid, exampleDoc, emptyDoc, defaultLibrary, libraryV2, makePins, newPin, pinNumbers, nextName, prefixOf } from './model';
 
 const load = (key, fallback) => {
@@ -28,7 +29,16 @@ export const useStore = create(() => ({
   highlight: null, // Bündel-ID
   panel: null, // Handy: null | 'lib' | 'props'
   multi: false, // Mehrfachauswahl per Tippen (Ersatz für Shift)
+  theme: initialTheme(), // 'dark' | 'light'
 }));
+applyTheme(useStore.getState().theme);
+
+export function toggleTheme() {
+  const theme = useStore.getState().theme === 'light' ? 'dark' : 'light';
+  useStore.setState({ theme });
+  applyTheme(theme);
+  try { localStorage.setItem('wiretool.theme', theme); } catch {}
+}
 const S = useStore;
 
 // Automatisch im Browser zwischenspeichern

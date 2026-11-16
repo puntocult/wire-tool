@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore, mut, clickSelect, setSel, addWire, addSplice, addConnector, canvasApi, isSel, toggleMulti } from './store';
+import { PALETTES } from './theme';
 import { CW, HH, RH, connHeight, COLORS, wireGeom, fuseWarnings, valueLabel, elementLabel } from './model';
 
 const snap = (v) => Math.round(v / 10) * 10;
 const ACCENT = '#3dd68c';
-const WARN = '#f5a524';
 
 export default function Canvas() {
   const doc = useStore((s) => s.doc);
@@ -19,6 +19,7 @@ export default function Canvas() {
   const touches = useRef(new Map()); // aktive Finger: pointerId -> Position
   const [ghost, setGhost] = useState(null);
   const multi = useStore((s) => s.multi);
+  const P = PALETTES[useStore((s) => s.theme)];
 
   const toWorld = (e) => {
     const r = svgRef.current.getBoundingClientRect();
@@ -221,17 +222,17 @@ export default function Canvas() {
       >
         <defs>
           <pattern id="dots" width="20" height="20" patternUnits="userSpaceOnUse" patternTransform={`translate(${view.x},${view.y}) scale(${view.k})`}>
-            <circle cx="1" cy="1" r="1" fill="#262830" />
+            <circle cx="1" cy="1" r="1" fill={P.dots} />
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill="url(#dots)" />
         <g transform={`translate(${view.x},${view.y}) scale(${view.k})`}>
           <g ref={contentRef} fontFamily="Inter, 'Segoe UI', system-ui, sans-serif">
             {doc.wires.map((w, i) => (
-              <Wire key={w.id} doc={doc} w={w} idx={i} selected={selSet.has('w' + w.id)} warn={warn.wires.has(w.id)} dim={hbSet && !hbSet.has(w.id)} onDown={(e) => downWire(e, w)} />
+              <Wire key={w.id} P={P} doc={doc} w={w} idx={i} selected={selSet.has('w' + w.id)} warn={warn.wires.has(w.id)} dim={hbSet && !hbSet.has(w.id)} onDown={(e) => downWire(e, w)} />
             ))}
             {doc.connectors.map((c) => (
-              <Connector key={c.id} c={c} selected={selSet.has('c' + c.id)} warnSlots={warn.slots} onDown={(e) => startNode(e, 'c', c.id)} onPort={startWire} />
+              <Connector key={c.id} P={P} c={c} selected={selSet.has('c' + c.id)} warnSlots={warn.slots} onDown={(e) => startNode(e, 'c', c.id)} onPort={startWire} />
             ))}
             {doc.splices.map((s) => (
               <g
@@ -243,8 +244,8 @@ export default function Canvas() {
               >
                 {selSet.has('s' + s.id) && <circle className="sel" r="10" fill="none" stroke={ACCENT} strokeWidth="1.5" />}
                 <circle r="10" fill="transparent" />
-                <circle r="5" fill="#e8eaee" stroke="#0b0c0f" strokeWidth="2" />
-                <text y="-13" textAnchor="middle" fontSize="10" fill="#7c818b">{s.name}</text>
+                <circle r="5" fill={P.text} stroke={P.casing} strokeWidth="2" />
+                <text y="-13" textAnchor="middle" fontSize="10" fill={P.dim}>{s.name}</text>
               </g>
             ))}
           </g>
@@ -271,7 +272,7 @@ export default function Canvas() {
   );
 }
 
-function Wire({ doc, w, idx, selected, warn, dim, onDown }) {
+function Wire({ P, doc, w, idx, selected, warn, dim, onDown }) {
   const g = wireGeom(doc, w, idx);
   if (!g) return null;
   const col = COLORS[w.color]?.hex ?? '#888';
@@ -280,9 +281,9 @@ function Wire({ doc, w, idx, selected, warn, dim, onDown }) {
   const common = { d: g.d, fill: 'none', strokeLinejoin: 'round' };
   return (
     <g opacity={dim ? 0.12 : 1}>
-      {warn && <path className="sel" {...common} stroke={WARN} strokeOpacity="0.35" strokeWidth={sw + 6} strokeDasharray="4 4" />}
+      {warn && <path className="sel" {...common} stroke={P.warn} strokeOpacity="0.35" strokeWidth={sw + 6} strokeDasharray="4 4" />}
       {selected && <path className="sel" {...common} stroke={ACCENT} strokeOpacity="0.4" strokeWidth={sw + 8} strokeLinecap="round" />}
-      <path {...common} stroke="#0b0c0f" strokeWidth={sw + 2.5} />
+      <path {...common} stroke={P.casing} strokeWidth={sw + 2.5} />
       <path {...common} stroke={col} strokeWidth={sw} />
       {stripe && <path {...common} stroke={stripe} strokeWidth={sw * 0.5} strokeDasharray="7 7" />}
       <path className="hit" {...common} stroke="transparent" strokeWidth="12" onPointerDown={onDown} style={{ cursor: selected ? 'ew-resize' : 'pointer' }} />
@@ -290,7 +291,7 @@ function Wire({ doc, w, idx, selected, warn, dim, onDown }) {
   );
 }
 
-function Connector({ c, selected, warnSlots, onDown, onPort }) {
+function Connector({ P, c, selected, warnSlots, onDown, onPort }) {
   const h = connHeight(c);
   const label = c.part || c.typeName ? elementLabel(c) : '';
   const maxType = Math.max(0, Math.floor((CW - 36 - c.name.length * 7.5) / 5.8));
@@ -298,32 +299,32 @@ function Connector({ c, selected, warnSlots, onDown, onPort }) {
   return (
     <g className="conn" transform={`translate(${c.x},${c.y})`} onPointerDown={onDown}>
       {selected && <rect className="sel" x={-3} y={-3} width={CW + 6} height={h + 6} rx="10" fill="none" stroke={ACCENT} strokeWidth="1.5" />}
-      <rect width={CW} height={h} rx="7" fill="#16171b" stroke="#2c2e35" />
-      <path d={`M0,${HH} H${CW}`} stroke="#2c2e35" />
-      <text x="12" y="19" fontSize="12" fontWeight="600" fill="#e8eaee">{c.name}</text>
-      <text x={CW - 12} y="19" fontSize="10" textAnchor="end" fill="#7c818b">{type}</text>
+      <rect width={CW} height={h} rx="7" fill={P.card} stroke={P.cardStroke} />
+      <path d={`M0,${HH} H${CW}`} stroke={P.cardStroke} />
+      <text x="12" y="19" fontSize="12" fontWeight="600" fill={P.text}>{c.name}</text>
+      <text x={CW - 12} y="19" fontSize="10" textAnchor="end" fill={P.dim}>{type}</text>
       {c.pins.map((p, i) => {
         const y = HH + i * RH;
         return (
           <g key={p.id} data-conn={c.id} data-pin={p.id} data-pout={p.outId}>
             <rect x="0" y={y} width={CW} height={RH} fill="transparent" />
-            {i > 0 && <path d={`M8,${y} H${CW - 8}`} stroke="#212329" />}
+            {i > 0 && <path d={`M8,${y} H${CW - 8}`} stroke={P.sep} />}
             <text x="12" y={y + 14} fontSize="11" fill="#6f747e">{p.num}</text>
             {c.part ? (
               <>
                 <PartSymbol part={c.part} cy={y + RH / 2} />
-                <text x="64" y={y + 14} fontSize="11" fontWeight="600" fill={warnSlots.has(p.id) ? WARN : '#c8cbd2'}>{valueLabel(c.part, p.value)}</text>
-                <text x={CW - 12} y={y + 14} fontSize="10" textAnchor="end" fill="#7c818b">{p.signal}</text>
+                <text x="64" y={y + 14} fontSize="11" fontWeight="600" fill={warnSlots.has(p.id) ? P.warn : P.signal}>{valueLabel(c.part, p.value)}</text>
+                <text x={CW - 12} y={y + 14} fontSize="10" textAnchor="end" fill={P.dim}>{p.signal}</text>
               </>
             ) : (
-              <text x="40" y={y + 14} fontSize="11" fill="#c8cbd2">{p.signal}</text>
+              <text x="40" y={y + 14} fontSize="11" fill={P.signal}>{p.signal}</text>
             )}
             {[0, CW].map((px) => {
               const pid = c.part && px ? p.outId : p.id;
               return (
                 <g key={px} className="port" onPointerDown={(e) => onPort(e, { c: c.id, p: pid }, { x: c.x + px, y: c.y + y + RH / 2 })}>
                   <circle className="hitc" cx={px} cy={y + RH / 2} r="8" fill="transparent" />
-                  <circle cx={px} cy={y + RH / 2} r="3.5" fill={ACCENT} stroke="#0b0c0f" strokeWidth="1.5" />
+                  <circle cx={px} cy={y + RH / 2} r="3.5" fill={ACCENT} stroke={P.casing} strokeWidth="1.5" />
                 </g>
               );
             })}

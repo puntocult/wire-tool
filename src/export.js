@@ -1,4 +1,5 @@
-import { canvasApi } from './store';
+import { canvasApi, useStore } from './store';
+import { PALETTES, convertColors } from './theme';
 
 const safe = (name) => (name || 'kabelbaum').replace(/[\\/:*?"<>|]+/g, '_').trim();
 
@@ -22,25 +23,11 @@ export function downloadCSV(name, rows) {
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
-// Dunkle Zeichenfarben → helle Druckfarben (Drahtfarben bleiben unverändert)
-const LIGHT = {
-  '#0d0e11': '#ffffff', // Hintergrund
-  '#16171b': '#f7f7f8', // Steckerkarte
-  '#2c2e35': '#9ca0a8', // Kartenrahmen
-  '#212329': '#dfe1e5', // Pin-Trennlinien
-  '#e8eaee': '#16171b', // Titel, Steckername, Spleißpunkt
-  '#c8cbd2': '#2b2d33', // Signalnamen
-  '#7c818b': '#5d626c', // Typ, Spleißname, Datum
-  '#0b0c0f': '#3a3d44', // Drahtkontur
-};
-const toLight = (svg) => svg.replace(new RegExp(Object.keys(LIGHT).join('|'), 'g'), (c) => LIGHT[c]);
-
+// Exportiert den Plan hell oder dunkel – unabhängig davon, welcher Modus gerade eingestellt ist
+// (Drahtfarben bleiben unverändert)
 export function buildSVG(title, light = false) {
-  const svg = buildDarkSVG(title);
-  return light ? toLight(svg) : svg;
-}
-
-function buildDarkSVG(title) {
+  const target = light ? 'light' : 'dark';
+  const P = PALETTES[target];
   const g = canvasApi.content();
   const b = g.getBBox();
   const pad = 40;
@@ -51,10 +38,10 @@ function buildDarkSVG(title) {
   const date = new Date().toLocaleDateString('de-DE');
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${x} ${y} ${w} ${h}">` +
-    `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#0d0e11"/>` +
-    `<text x="${x + pad}" y="${y + pad}" font-family="Inter, 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="#e8eaee">${esc(title)}` +
-    `<tspan dx="12" font-size="11" font-weight="400" fill="#7c818b">${date}</tspan></text>` +
-    new XMLSerializer().serializeToString(clone) +
+    `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${P.exportBg}"/>` +
+    `<text x="${x + pad}" y="${y + pad}" font-family="Inter, 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="${P.text}">${esc(title)}` +
+    `<tspan dx="12" font-size="11" font-weight="400" fill="${P.dim}">${date}</tspan></text>` +
+    convertColors(new XMLSerializer().serializeToString(clone), useStore.getState().theme, target) +
     `</svg>`
   );
 }

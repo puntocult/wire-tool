@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useStore, setView, deleteSelection, setSel, newDoc, openDoc, copySelection, pasteClipboard, duplicateSelection, setPanel } from './store';
+import { useStore, setView, deleteSelection, setSel, newDoc, openDoc, copySelection, pasteClipboard, duplicateSelection, setPanel, toggleTheme } from './store';
 import Canvas from './Canvas';
 import Sidebar from './Sidebar';
 import Inspector from './Inspector';
@@ -73,6 +73,7 @@ function Logo() {
 function TopBar({ view }) {
   const name = useStore((s) => s.doc.name);
   const panel = useStore((s) => s.panel);
+  const theme = useStore((s) => s.theme);
   const fileRef = useRef(null);
   const [menu, setMenu] = useState(false);
   const [light, setLight] = useState(true);
@@ -105,6 +106,9 @@ function TopBar({ view }) {
       <button className="ghost desk-only" onClick={doOpen}>Öffnen</button>
       <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={onFile} />
       <button className="desk-only" onClick={doSave}>Speichern</button>
+      <button className="icon theme-btn" title={theme === 'light' ? 'Dunkler Modus' : 'Heller Modus'} onClick={toggleTheme}>
+        {theme === 'light' ? '☾' : '☀'}
+      </button>
       <div className="menu-wrap">
         <button className="primary" onClick={() => setMenu(!menu)}>
           <span className="desk-only">Export ▾</span><span className="mobile-only">⋯</span>
