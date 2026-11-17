@@ -41,7 +41,8 @@ export const PARTS = {
   resistor: { label: 'Widerstand', prefix: 'R', placeholder: 'z. B. 1 kΩ' },
   switch: { label: 'Schalter', prefix: 'SW', placeholder: 'z. B. EIN/AUS' },
 };
-export const prefixOf = (part) => PARTS[part]?.prefix ?? 'X';
+// Kennbuchstabe: X Stecker, G Stromversorgung, F/V/R/SW Bauteile
+export const prefixOf = (type) => (type?.source ? 'G' : PARTS[type?.part]?.prefix ?? 'X');
 
 export const newPin = (num, part) => ({ id: uid('p'), num, signal: '', ...(part ? { outId: uid('p'), value: '' } : {}) });
 export const makePins = (nums, part) => nums.map((num) => newPin(num, part));
@@ -189,8 +190,14 @@ export function epInfo(doc, ep) {
   return { name: c?.name ?? '?', pin: (p?.num ?? '?') + (c?.part ? ' ein' : ''), signal: p?.signal ?? '' };
 }
 
+export const voltageLabel = (v) => (v ? String(v).trim() + (/^[\d.,]+$/.test(String(v).trim()) ? ' V' : '') : '');
+
+// Art eines Elements bzw. Bibliothekstyps: Stecker, Stromversorgung oder Durchgangs-Bauteil
+export const kindOf = (x) => (x.part ? 'part' : x.source ? 'source' : 'conn');
+
 export function elementLabel(c) {
   if (c.typeName) return c.typeName;
+  if (c.source) return 'Stromversorgung' + (c.voltage ? ' ' + voltageLabel(c.voltage) : '');
   if (c.part) return PARTS[c.part].label + (c.pins.length > 1 ? ` ${c.pins.length}-fach` : '');
   return `frei (${c.pins.length}-pol.)`;
 }
@@ -281,9 +288,15 @@ export const defaultLibrary = () => [
   { id: uid('t'), name: 'JST XH 3-pol. Gehäuse', manufacturer: 'JST', partNumber: 'XHP-3', pinCount: 3, pinNames: '' },
   { id: uid('t'), name: 'Ringkabelschuh M6', manufacturer: '', partNumber: '', pinCount: 1, pinNames: '' },
   ...libraryV2(),
+  ...libraryV3(),
 ];
 
 // Vorlagen, die mit den Bauteilen dazugekommen sind (werden bestehenden Bibliotheken einmalig ergänzt)
+export const libraryV3 = () => [
+  { id: uid('t'), source: true, voltage: '12', name: 'Batterie 12 V', manufacturer: '', partNumber: '', pinCount: 2, pinNames: '+,−' },
+  { id: uid('t'), source: true, voltage: '12', name: 'Netzteil 12 V', manufacturer: '', partNumber: '', pinCount: 2, pinNames: '+,−' },
+];
+
 export const libraryV2 = () => [
   { id: uid('t'), part: 'fuse', name: 'Fliegender Sicherungshalter Mini', manufacturer: '', partNumber: '', pinCount: 1, pinNames: '' },
   { id: uid('t'), part: 'fuse', name: 'Sicherungskasten 6-fach Mini', manufacturer: '', partNumber: '', pinCount: 6, pinNames: '' },

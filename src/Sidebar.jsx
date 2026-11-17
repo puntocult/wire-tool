@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore, mut, mutLib, addConnector, canvasApi, setView, setPanel, createBundle, setBundleWires, toggleHighlight } from './store';
-import { uid, PARTS } from './model';
+import { uid, PARTS, voltageLabel } from './model';
 
 export default function Sidebar() {
   return (
@@ -35,7 +35,11 @@ function Library() {
             <div className="item-main" title="Klicken, um im Plan zu platzieren" onClick={() => place(t)}>
               <div className="item-title">{t.name}</div>
               <div className="item-sub">
-                {[t.part && PARTS[t.part]?.label, t.partNumber, t.part ? (t.pinCount > 1 ? t.pinCount + '-fach' : '') : t.pinCount + '-pol.'].filter(Boolean).join(' · ')}
+                {[
+                  t.part ? PARTS[t.part]?.label : t.source ? 'Stromversorgung' : '',
+                  t.partNumber,
+                  t.part ? (t.pinCount > 1 ? t.pinCount + '-fach' : '') : t.source ? voltageLabel(t.voltage) : t.pinCount + '-pol.',
+                ].filter(Boolean).join(' · ')}
               </div>
             </div>
             <button className="icon" title="Bearbeiten" onClick={() => setEdit(t)}>✎</button>
@@ -68,11 +72,20 @@ function TypeForm({ value, onClose }) {
       <label className="field"><span>Name</span><input autoFocus value={v.name} onChange={f('name')} /></label>
       <label className="field">
         <span>Art</span>
-        <select value={v.part || ''} onChange={f('part')}>
+        <select
+          value={v.part || (v.source ? 'source' : '')}
+          onChange={(e) => {
+            const k = e.target.value;
+            if (k === 'source') setV({ ...v, part: '', source: true, pinNames: v.pinNames || '+,−', voltage: v.voltage ?? '12' });
+            else setV({ ...v, part: k, source: false });
+          }}
+        >
           <option value="">Stecker / Sockel (Pins)</option>
+          <option value="source">Stromversorgung (+ / −)</option>
           {Object.entries(PARTS).map(([k, p]) => <option key={k} value={k}>{p.label} (Eingang → Ausgang)</option>)}
         </select>
       </label>
+      {v.source && <label className="field"><span>Spannung (V)</span><input inputMode="decimal" value={v.voltage ?? ''} onChange={f('voltage')} /></label>}
       <div className="row2">
         <label className="field"><span>Hersteller</span><input value={v.manufacturer} onChange={f('manufacturer')} /></label>
         <label className="field"><span>Teilenummer</span><input value={v.partNumber} onChange={f('partNumber')} /></label>

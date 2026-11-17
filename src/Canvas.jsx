@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore, mut, clickSelect, setSel, addWire, addSplice, addConnector, canvasApi, isSel, toggleMulti } from './store';
 import { PALETTES } from './theme';
-import { CW, HH, RH, connHeight, COLORS, wireGeom, fuseWarnings, valueLabel, elementLabel } from './model';
+import { CW, HH, RH, connHeight, COLORS, wireGeom, fuseWarnings, valueLabel, elementLabel, voltageLabel } from './model';
 
 const snap = (v) => Math.round(v / 10) * 10;
 const ACCENT = '#3dd68c';
+// Polaritätsfarben für Anschlüsse von Stromversorgungen
+const POLE = { '+': '#e5484d', '-': '#3e8ef7', '−': '#3e8ef7' };
 
 export default function Canvas() {
   const doc = useStore((s) => s.doc);
@@ -257,6 +259,7 @@ export default function Canvas() {
       <div className="toolbar">
         <button onClick={() => { const p = canvasApi.center(); addConnector(null, p.x, p.y); }}>+ Stecker</button>
         <button onClick={() => { const p = canvasApi.center(); addConnector({ part: 'fuse', pinCount: 1 }, p.x, p.y); }}>+ Sicherung</button>
+        <button onClick={() => { const p = canvasApi.center(); addConnector({ source: true, voltage: '12', pinCount: 2, pinNames: '+,−' }, p.x, p.y); }}>+ Batterie</button>
         <button onClick={() => { const p = canvasApi.center(); addSplice(p.x + CW / 2, p.y + 60); }}>+ Spleiß</button>
         <span className="sep" />
         <button className={multi ? 'on' : 'ghost'} title="Mehrfachauswahl: Antippen fügt hinzu/entfernt (wie Shift+Klick)" onClick={toggleMulti}>Mehrfach</button>
@@ -293,8 +296,12 @@ function Wire({ P, doc, w, idx, selected, warn, dim, onDown }) {
 
 function Connector({ P, c, selected, warnSlots, onDown, onPort }) {
   const h = connHeight(c);
-  const label = c.part || c.typeName ? elementLabel(c) : '';
-  const maxType = Math.max(0, Math.floor((CW - 36 - c.name.length * 7.5) / 5.8));
+  const label = c.source ? c.typeName : c.part || c.typeName ? elementLabel(c) : '';
+  // Stromversorgung: Batteriesymbol + Spannung hinter dem Namen
+  const symX = 12 + c.name.length * 7.5 + 8;
+  const volt = c.source ? voltageLabel(c.voltage) : '';
+  const used = c.source ? symX + 16 + volt.length * 6.8 : 12 + c.name.length * 7.5;
+  const maxType = Math.max(0, Math.floor((CW - 24 - used) / 5.8));
   const type = label.length > maxType ? label.slice(0, Math.max(0, maxType - 1)) + '…' : label;
   return (
     <g className="conn" transform={`translate(${c.x},${c.y})`} onPointerDown={onDown}>
@@ -303,13 +310,27 @@ function Connector({ P, c, selected, warnSlots, onDown, onPort }) {
       <path d={`M0,${HH} H${CW}`} stroke={P.cardStroke} />
       <text x="12" y="19" fontSize="12" fontWeight="600" fill={P.text}>{c.name}</text>
       <text x={CW - 12} y="19" fontSize="10" textAnchor="end" fill={P.dim}>{type}</text>
+      {c.source && (
+        <>
+          <g stroke={P.text} fill="none">
+            <path d={`M${symX},15 H${symX + 3} M${symX + 9},15 H${symX + 12}`} strokeWidth="1.2" />
+            <path d={`M${symX + 3},8 V22`} stroke={POLE['+']} strokeWidth="1.4" />
+            <path d={`M${symX + 9},11 V19`} stroke={POLE['−']} strokeWidth="3" />
+          </g>
+          <text x={symX + 17} y="19" fontSize="11" fontWeight="600" fill={P.signal}>{volt}</text>
+        </>
+      )}
       {c.pins.map((p, i) => {
         const y = HH + i * RH;
         return (
           <g key={p.id} data-conn={c.id} data-pin={p.id} data-pout={p.outId}>
             <rect x="0" y={y} width={CW} height={RH} fill="transparent" />
             {i > 0 && <path d={`M8,${y} H${CW - 8}`} stroke={P.sep} />}
-            <text x="12" y={y + 14} fontSize="11" fill="#6f747e">{p.num}</text>
+            {c.source && POLE[p.num.trim()] ? (
+              <text x="12" y={y + 14} fontSize="13" fontWeight="700" fill={POLE[p.num.trim()]}>{p.num}</text>
+            ) : (
+              <text x="12" y={y + 14} fontSize="11" fill="#6f747e">{p.num}</text>
+            )}
             {c.part ? (
               <>
                 <PartSymbol part={c.part} cy={y + RH / 2} />

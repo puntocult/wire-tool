@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { initialTheme, applyTheme } from './theme';
-import { uid, exampleDoc, emptyDoc, defaultLibrary, libraryV2, makePins, newPin, pinNumbers, nextName, prefixOf } from './model';
+import { uid, exampleDoc, emptyDoc, defaultLibrary, libraryV2, libraryV3, makePins, newPin, pinNumbers, nextName, prefixOf } from './model';
 
 const load = (key, fallback) => {
   try {
@@ -14,10 +14,11 @@ const load = (key, fallback) => {
 // Bestehende Bibliotheken einmalig um die Bauteil-Vorlagen ergänzen
 function loadLibrary() {
   const lib = load('wiretool.library', defaultLibrary);
-  if (localStorage.getItem('wiretool.libVersion') !== '2') {
-    if (localStorage.getItem('wiretool.library')) lib.push(...libraryV2());
-    localStorage.setItem('wiretool.libVersion', '2');
-  }
+  const had = !!localStorage.getItem('wiretool.library');
+  const ver = +(localStorage.getItem('wiretool.libVersion') || 1);
+  if (had && ver < 2) lib.push(...libraryV2());
+  if (had && ver < 3) lib.push(...libraryV3());
+  localStorage.setItem('wiretool.libVersion', '3');
   return lib;
 }
 
@@ -82,8 +83,9 @@ const pruneBundles = (d) => {
 export function addConnector(type, x, y) {
   const id = uid('c');
   const part = type?.part || undefined;
+  const source = type?.source ? { source: true, voltage: type.voltage ?? '' } : {};
   mut((d) => d.connectors.push({
-    id, name: nextName(d.connectors, prefixOf(part)), part, typeId: type?.id ?? null, typeName: type?.name ?? '',
+    id, name: nextName(d.connectors, prefixOf(type)), part, ...source, typeId: type?.id ?? null, typeName: type?.name ?? '',
     manufacturer: type?.manufacturer ?? '', partNumber: type?.partNumber ?? '',
     x, y, pins: makePins(pinNumbers(type, type?.pinCount ? undefined : 4), part),
   }));
@@ -189,6 +191,7 @@ export function applyType(connId, type) {
     const c = d.connectors.find((x) => x.id === connId);
     // Art bleibt erhalten (Stecker ↔ Durchgangs-Bauteil würde die Anschlüsse ändern); nur die Bauteilart wechselt
     if (c.part && type?.part) c.part = type.part;
+    if (c.source && type?.voltage) c.voltage = type.voltage;
     c.typeId = type?.id ?? null;
     c.typeName = type?.name ?? '';
     c.manufacturer = type?.manufacturer ?? '';

@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useStore, mut, setSel, setPanel, deleteSelection, duplicateSelection, setPinCount, applyType, lastStyle, setBundleWires, createBundle } from './store';
-import { COLORS, CROSS_SECTIONS, PARTS, fmtCs, epInfo, autoLength, wireLength, fmtNum, fuseWarnings, fuseMaxOf, parseRating } from './model';
+import { COLORS, CROSS_SECTIONS, PARTS, kindOf, fmtCs, epInfo, autoLength, wireLength, fmtNum, fuseWarnings, fuseMaxOf, parseRating } from './model';
 
 const fuseText = (f) => `${f.fuse} ist mit ${fmtNum(f.rating)} A abgesichert – Richtwert für diesen Querschnitt: max. ${fmtNum(f.max)} A.`;
 
@@ -121,13 +121,16 @@ function FuseTable({ doc }) {
 function ConnPanel({ c, library }) {
   const set = (k, v) => mut((d) => (d.connectors.find((x) => x.id === c.id)[k] = v));
   const setPin = (pid, k, v) => mut((d) => (d.connectors.find((x) => x.id === c.id).pins.find((p) => p.id === pid)[k] = v));
-  const types = library.filter((t) => !!t.part === !!c.part);
+  const types = library.filter((t) => kindOf(t) === kindOf(c));
   const known = types.some((t) => t.id === c.typeId);
-  const what = c.part ? PARTS[c.part].label : 'Stecker';
+  const what = c.part ? PARTS[c.part].label : c.source ? 'Stromversorgung' : 'Stecker';
   return (
     <>
       <h2>{what}</h2>
       <Field label="Bezeichnung"><input value={c.name} onChange={(e) => set('name', e.target.value)} /></Field>
+      {c.source && (
+        <Field label="Spannung (V)"><input inputMode="decimal" placeholder="z. B. 12" value={c.voltage ?? ''} onChange={(e) => set('voltage', e.target.value)} /></Field>
+      )}
       {c.part && (
         <Field label="Bauteilart">
           <select value={c.part} onChange={(e) => set('part', e.target.value)}>
@@ -147,8 +150,8 @@ function ConnPanel({ c, library }) {
         <Field label="Hersteller"><input value={c.manufacturer} onChange={(e) => set('manufacturer', e.target.value)} /></Field>
         <Field label="Teilenummer"><input value={c.partNumber} onChange={(e) => set('partNumber', e.target.value)} /></Field>
       </div>
-      <Field label={c.part ? 'Anzahl Plätze' : 'Pinzahl'}><CommitNumber min="1" max="99" value={c.pins.length} onCommit={(n) => setPinCount(c.id, n)} /></Field>
-      <h3>{c.part ? 'Plätze (Eingang links → Ausgang rechts)' : 'Pins'}</h3>
+      <Field label={c.part ? 'Anzahl Plätze' : c.source ? 'Anzahl Anschlüsse' : 'Pinzahl'}><CommitNumber min="1" max="99" value={c.pins.length} onCommit={(n) => setPinCount(c.id, n)} /></Field>
+      <h3>{c.part ? 'Plätze (Eingang links → Ausgang rechts)' : c.source ? 'Anschlüsse (+ und − werden farbig markiert)' : 'Pins'}</h3>
       <div className="pins">
         {c.pins.map((p) => (
           <div key={p.id} className={'pin-row' + (c.part ? ' part' : '')}>
