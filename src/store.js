@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { initialTheme, applyTheme } from './theme';
-import { uid, exampleDoc, emptyDoc, defaultLibrary, libraryV2, libraryV3, makePins, newPin, pinNumbers, nextName, prefixOf } from './model';
+import { uid, exampleDoc, emptyDoc, defaultLibrary, libraryV2, libraryV3, makePins, newPin, pinNumbers, nextName, prefixOf, GROUND_PREFIX } from './model';
 
 const load = (key, fallback) => {
   try {
@@ -99,6 +99,13 @@ export function addSplice(x, y) {
   return id;
 }
 
+export function addGround(x, y) {
+  const id = uid('s');
+  mut((d) => d.splices.push({ id, name: nextName(d.splices, GROUND_PREFIX), ground: true, location: '', terminal: '', x, y }));
+  setSel([{ t: 's', id }]);
+  return id;
+}
+
 export function addWire(a, b) {
   const id = uid('w');
   mut((d) => d.wires.push({ id, name: nextName(d.wires, 'W'), a, b, ...lastStyle, length: null, mx: null }));
@@ -145,7 +152,7 @@ function insertCopy(data, off) {
     for (const s of data.splices) {
       const id = uid('s');
       map[s.id] = id;
-      d.splices.push({ ...s, id, name: nextName(d.splices, 'S'), x: s.x + off, y: s.y + off });
+      d.splices.push({ ...s, id, name: nextName(d.splices, s.ground ? GROUND_PREFIX : 'S'), x: s.x + off, y: s.y + off });
       sel.push({ t: 's', id });
     }
     const ep = (e) => (e.s ? { s: map[e.s] } : { c: map[e.c], p: map[e.p] });

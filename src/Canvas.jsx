@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useStore, mut, clickSelect, setSel, addWire, addSplice, addConnector, canvasApi, isSel, toggleMulti } from './store';
+import { useStore, mut, clickSelect, setSel, addWire, addSplice, addGround, addConnector, canvasApi, isSel, toggleMulti } from './store';
 import { PALETTES } from './theme';
 import { CW, HH, RH, connHeight, COLORS, wireGeom, fuseWarnings, valueLabel, elementLabel, voltageLabel } from './model';
 
@@ -244,10 +244,16 @@ export default function Canvas() {
                 data-splice={s.id}
                 onPointerDown={(e) => downSplice(e, s)}
               >
-                {selSet.has('s' + s.id) && <circle className="sel" r="10" fill="none" stroke={ACCENT} strokeWidth="1.5" />}
-                <circle r="10" fill="transparent" />
-                <circle r="5" fill={P.text} stroke={P.casing} strokeWidth="2" />
-                <text y="-13" textAnchor="middle" fontSize="10" fill={P.dim}>{s.name}</text>
+                {s.ground ? (
+                  <GroundSymbol P={P} s={s} selected={selSet.has('s' + s.id)} />
+                ) : (
+                  <>
+                    {selSet.has('s' + s.id) && <circle className="sel" r="10" fill="none" stroke={ACCENT} strokeWidth="1.5" />}
+                    <circle r="10" fill="transparent" />
+                    <circle r="5" fill={P.text} stroke={P.casing} strokeWidth="2" />
+                    <text y="-13" textAnchor="middle" fontSize="10" fill={P.dim}>{s.name}</text>
+                  </>
+                )}
               </g>
             ))}
           </g>
@@ -261,6 +267,7 @@ export default function Canvas() {
         <button onClick={() => { const p = canvasApi.center(); addConnector({ part: 'fuse', pinCount: 1 }, p.x, p.y); }}>+ Sicherung</button>
         <button onClick={() => { const p = canvasApi.center(); addConnector({ source: true, voltage: '12', pinCount: 2, pinNames: '+,−' }, p.x, p.y); }}>+ Batterie</button>
         <button onClick={() => { const p = canvasApi.center(); addSplice(p.x + CW / 2, p.y + 60); }}>+ Spleiß</button>
+        <button title="Massepunkt: Anschlusspunkt an Karosserie/Masse, an dem mehrere Drähte enden" onClick={() => { const p = canvasApi.center(); addGround(p.x + CW / 2, p.y + 60); }}>+ Masse</button>
         <span className="sep" />
         <button className={multi ? 'on' : 'ghost'} title="Mehrfachauswahl: Antippen fügt hinzu/entfernt (wie Shift+Klick)" onClick={toggleMulti}>Mehrfach</button>
         <button className="ghost zoom-btn" onClick={() => zoomBy(1 / 1.2)}>−</button>
@@ -269,7 +276,7 @@ export default function Canvas() {
         <button className="ghost" onClick={() => canvasApi.fit()}>Einpassen</button>
       </div>
       <div className="hintbar">
-        Vom Pin-Punkt ziehen: Draht · ins Leere ziehen: Spleiß · Alt+Ziehen am Spleiß: Draht · Shift+Klick: Mehrfachauswahl · Strg+C/V, Strg+D: kopieren/duplizieren ·ausgewählten Draht ziehen: Führung verschieben · Entf: löschen
+        Vom Pin-Punkt ziehen: Draht · ins Leere ziehen: Spleiß · Alt+Ziehen am Spleiß/Massepunkt: Draht · Shift+Klick: Mehrfachauswahl · Strg+C/V, Strg+D: kopieren/duplizieren ·ausgewählten Draht ziehen: Führung verschieben · Entf: löschen
       </div>
     </>
   );
@@ -363,4 +370,25 @@ function PartSymbol({ part, cy }) {
   if (part === 'resistor') return <g {...s}><path d={`M28,${cy} H32 M54,${cy} H58`} /><rect x="32" y={cy - 4} width="22" height="8" rx="1" /></g>;
   if (part === 'diode') return <g {...s}><path d={`M28,${cy} H58`} /><path d={`M37,${cy - 5} L37,${cy + 5} L47,${cy} Z`} fill="#8a8f99" /><path d={`M47,${cy - 5} V${cy + 5}`} /></g>;
   return <g {...s}><path d={`M28,${cy} H35 L50,${cy - 6} M51,${cy} H58`} /><circle cx="35" cy={cy} r="1.6" fill="#8a8f99" /><circle cx="51" cy={cy} r="1.6" fill="#8a8f99" /></g>;
+}
+
+// Massepunkt: Anschlusspunkt (Drähte enden in der Mitte) mit Massezeichen darunter,
+// Bezeichnung darüber und Einbauort darunter
+function GroundSymbol({ P, s, selected }) {
+  const loc = s.location?.length > 28 ? s.location.slice(0, 27) + '…' : s.location;
+  return (
+    <>
+      {selected && <rect className="sel" x="-18" y="-26" width="36" height="52" rx="6" fill="none" stroke={ACCENT} strokeWidth="1.5" />}
+      <rect x="-18" y="-26" width="36" height="52" fill="transparent" />
+      <g stroke={P.text} strokeLinecap="round" fill="none">
+        <path d="M0,0 V12" strokeWidth="2" />
+        <path d="M-11,12 H11" strokeWidth="2.4" />
+        <path d="M-7,16.5 H7" strokeWidth="2.2" />
+        <path d="M-3,21 H3" strokeWidth="2" />
+      </g>
+      <circle r="5" fill={P.text} stroke={P.casing} strokeWidth="2" />
+      <text y="-13" textAnchor="middle" fontSize="11" fontWeight="600" fill={P.text}>{s.name}</text>
+      {loc && <text y="36" textAnchor="middle" fontSize="10" fill={P.dim}>{loc}</text>}
+    </>
+  );
 }
