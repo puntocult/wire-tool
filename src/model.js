@@ -98,6 +98,9 @@ export function nextName(items, prefix) {
 }
 
 // Endpunkt eines Drahts: { c: connectorId, p: pinId } oder { s: spliceId }
+// Massepunkte sind Knoten wie Spleiße (doc.splices mit ground: true), an denen beliebig viele Drähte enden.
+export const GROUND_PREFIX = 'GND';
+export const isGround = (s) => !!s?.ground;
 export function epCenter(doc, ep) {
   if (ep.s) {
     const s = doc.splices.find((x) => x.id === ep.s);
@@ -179,7 +182,7 @@ export const wireLength = (doc, w) => (w.length != null ? w.length : autoLength(
 export function epInfo(doc, ep) {
   if (ep.s) {
     const s = doc.splices.find((x) => x.id === ep.s);
-    return { name: s?.name ?? '?', pin: '', signal: '' };
+    return { name: s?.name ?? '?', pin: '', signal: s?.ground ? 'Masse' : '' };
   }
   const c = doc.connectors.find((x) => x.id === ep.c);
   const p = c?.pins.find((x) => x.id === ep.p);
@@ -272,11 +275,21 @@ export function bom(doc) {
     fmtNum((g.reduce((s, b) => s + (+b.length || 0), 0) / 1000).toFixed(2)),
   ]);
 
+  const grounds = doc.splices.filter(isGround).sort(byName).map((g, i) => [
+    i + 1,
+    g.name,
+    g.location || '',
+    g.terminal || '',
+    doc.wires.filter((w) => w.a.s === g.id || w.b.s === g.id).length,
+  ]);
+  const spliceCount = doc.splices.filter((s) => !isGround(s)).length;
+
   return [
     { title: 'Stecker & Bauteile', header: ['Pos', 'Typ', 'Hersteller', 'Teilenummer', 'Menge', 'Bezeichner'], rows: conns },
     { title: 'Einsätze (Sicherungen, Dioden, Widerstände)', header: ['Pos', 'Bauteil', 'Wert', 'in', 'Menge', 'Plätze'], rows: inserts },
     { title: 'Leitungen', header: ['Pos', 'Farbe', 'Querschnitt (mm²)', 'Anzahl Drähte', 'Gesamtlänge (m)'], rows: wires, note: missing ? `${missing} Draht/Drähte ohne Länge – nicht in der Summe enthalten.` : '' },
-    { title: 'Spleiße', header: ['Pos', 'Bezeichnung', 'Menge'], rows: doc.splices.length ? [[1, 'Spleißverbinder', doc.splices.length]] : [] },
+    { title: 'Spleiße', header: ['Pos', 'Bezeichnung', 'Menge'], rows: spliceCount ? [[1, 'Spleißverbinder', spliceCount]] : [] },
+    { title: 'Massepunkte', header: ['Pos', 'Bezeichnung', 'Einbauort', 'Kabelschuh', 'Drähte'], rows: grounds },
     { title: 'Ummantelung', header: ['Pos', 'Ummantelung', 'Abschnitte', 'Gesamtlänge (m)'], rows: sleeves },
   ];
 }
@@ -323,8 +336,8 @@ export function exampleDoc() {
   const ecu = mk('X1', 'Steuergerät', '', 60, 80, ['12V', 'GND', 'INJ 1', 'INJ 2', 'CAN H', 'CAN L']);
   const inj1 = mk('X2', 'Deutsch DT 2-pol. Stecker', 'DT04-2P', 560, 40, ['INJ 1', '12V']);
   const inj2 = mk('X3', 'Deutsch DT 2-pol. Stecker', 'DT04-2P', 560, 160, ['INJ 2', '12V']);
-  const gnd = mk('X4', 'Ringkabelschuh M6', '', 560, 290, ['GND']);
-  const diag = mk('X5', 'Deutsch DT 4-pol. Stecker', 'DT04-4P', 560, 370, ['CAN H', 'CAN L', '', '']);
+  const gnd = { id: uid('s'), name: 'GND1', ground: true, location: 'Motorblock', terminal: 'Ringkabelschuh M6', x: 640, y: 300 };
+  const diag = mk('X4', 'Deutsch DT 4-pol. Stecker', 'DT04-4P', 560, 370, ['CAN H', 'CAN L', '', '']);
   const s1 = { id: uid('s'), name: 'S1', x: 400, y: 120 };
   const P = (c, i) => ({ c: c.id, p: c.pins[i].id });
   let n = 0;
@@ -335,15 +348,15 @@ export function exampleDoc() {
     W({ s: s1.id }, P(inj2, 1), 'RT', 0.75),
     W(P(ecu, 2), P(inj1, 0), 'GN', 0.75),
     W(P(ecu, 3), P(inj2, 0), 'BL', 0.75),
-    W(P(ecu, 1), P(gnd, 0), 'SW', 1.5),
+    W(P(ecu, 1), { s: gnd.id }, 'SW', 1.5),
     W(P(ecu, 4), P(diag, 0), 'GE', 0.35),
     W(P(ecu, 5), P(diag, 1), 'GN', 0.35, 'WS'),
   ];
   const ids = (...k) => k.map((i) => wires[i].id);
   return {
     name: 'Beispiel Einspritzung',
-    connectors: [ecu, inj1, inj2, gnd, diag],
-    splices: [s1],
+    connectors: [ecu, inj1, inj2, diag],
+    splices: [s1, gnd],
     wires,
     bundles: [
       { id: uid('b'), name: 'B1', length: 450, sleeve: 'Wellrohr NW10', wireIds: ids(0, 3, 4, 5, 6, 7) },

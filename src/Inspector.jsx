@@ -29,7 +29,7 @@ export default function Inspector() {
     const s = t === 's' && doc.splices.find((x) => x.id === id);
     const w = t === 'w' && doc.wires.find((x) => x.id === id);
     if (c) body = <ConnPanel c={c} library={library} />;
-    if (s) body = <SplicePanel s={s} doc={doc} />;
+    if (s) body = s.ground ? <GroundPanel s={s} doc={doc} /> : <SplicePanel s={s} doc={doc} />;
     if (w) body = <WirePanel w={w} doc={doc} />;
   }
   return (
@@ -55,7 +55,8 @@ function ProjectPanel({ doc }) {
       <div className="stats">
         <div><b>{doc.connectors.length}</b><span>Stecker</span></div>
         <div><b>{doc.wires.length}</b><span>Drähte</span></div>
-        <div><b>{doc.splices.length}</b><span>Spleiße</span></div>
+        <div><b>{doc.splices.filter((s) => !s.ground).length}</b><span>Spleiße</span></div>
+        <div><b>{doc.splices.filter((s) => s.ground).length}</b><span>Massepunkte</span></div>
         <div><b>{fmtNum((total / 1000).toFixed(2))}</b><span>m Draht</span></div>
       </div>
       <h3>Prüfung Absicherung</h3>
@@ -185,6 +186,29 @@ function SplicePanel({ s, doc }) {
       </ul>
       <button className="full" title="Strg+D" onClick={duplicateSelection}>Duplizieren</button>
       <button className="danger" onClick={deleteSelection}>Spleiß löschen</button>
+    </>
+  );
+}
+
+function GroundPanel({ s, doc }) {
+  const set = (k, v) => mut((d) => (d.splices.find((x) => x.id === s.id)[k] = v));
+  const wires = doc.wires.filter((w) => w.a.s === s.id || w.b.s === s.id);
+  return (
+    <>
+      <h2>Massepunkt</h2>
+      <Field label="Bezeichnung"><input value={s.name} onChange={(e) => set('name', e.target.value)} /></Field>
+      <Field label="Einbauort"><input placeholder="z. B. Karosserie A-Säule links" value={s.location ?? ''} onChange={(e) => set('location', e.target.value)} /></Field>
+      <Field label="Kabelschuh / Befestigung"><input placeholder="z. B. Ringkabelschuh M6" value={s.terminal ?? ''} onChange={(e) => set('terminal', e.target.value)} /></Field>
+      <h3>Angeschlossene Drähte ({wires.length})</h3>
+      <ul className="plain">
+        {wires.map((w) => {
+          const o = epInfo(doc, w.a.s === s.id ? w.b : w.a);
+          return <li key={w.id} className="link-item" onClick={() => setSel([{ t: 'w', id: w.id }])}><Dot w={w} /> {w.name} → {o.name}{o.pin && ':' + o.pin}{o.signal && <small className="dim"> {o.signal}</small>}</li>;
+        })}
+        {!wires.length && <li className="hint">keine – vom Pin auf den Massepunkt ziehen</li>}
+      </ul>
+      <button className="full" title="Strg+D" onClick={duplicateSelection}>Duplizieren</button>
+      <button className="danger" onClick={deleteSelection}>Massepunkt löschen</button>
     </>
   );
 }
